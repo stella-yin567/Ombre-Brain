@@ -70,7 +70,7 @@ embedding:
   enabled: true                   # Enable embedding / 启用向量化
   model: "gemini-embedding-001"   # Embedding model / 向量化模型
   # base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
-  # api_key: "AIzaSyAxyiphW8crj-ognjpneNNx2Q5pH5okjRI"                  
+  # api_key: ""                  
 
 # --- Scoring weights / 检索权重参数 ---
 # total = topic(×4) + emotion(×2) + time(×1.5) + importance(×1)
