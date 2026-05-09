@@ -69,7 +69,7 @@ decay:
 embedding:
   enabled: true                   # Enable embedding / 启用向量化
   model: "gemini-embedding-001"   # Embedding model / 向量化模型
-  # base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
+  base_url: "https://generativelanguage.googleapis.com/v1beta/openai"
   # api_key: ""                  
 
 # --- Scoring weights / 检索权重参数 ---
