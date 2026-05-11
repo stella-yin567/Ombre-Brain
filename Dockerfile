@@ -21,6 +21,7 @@ COPY *.py .
 COPY dashboard.html .
 COPY config.example.yaml ./config.yaml
 COPY start.sh .
+COPY nginx.conf .
 RUN chmod +x start.sh
 
 # Persistent mount point: bucket data
