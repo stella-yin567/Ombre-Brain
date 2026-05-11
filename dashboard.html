@@ -1051,7 +1051,7 @@ async function authFetch(url, options) {
 
 // ========================================
 
-const BASE = location.origin;
+const BASE = location.origin + getBasePath();
 let allBuckets = [];
 let currentFilter = 'all';
 
