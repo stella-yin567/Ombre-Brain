@@ -259,7 +259,7 @@ async def auth_logout(request):
     if token:
         _sessions.pop(token, None)
     resp = JSONResponse({"ok": True})
-    resp.delete_cookie("ombre_session")
+    resp.delete_cookie("ombre_session",path="/")
     return resp
 
 
