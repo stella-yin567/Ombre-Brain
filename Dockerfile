@@ -14,6 +14,7 @@ WORKDIR /app
 # 先装依赖（利用 Docker 缓存）
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y nginx && rm -rf /var/lib/apt/lists/*
 
 # Copy project files / 复制项目文件
 COPY *.py .
