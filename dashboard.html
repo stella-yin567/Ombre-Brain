@@ -869,7 +869,7 @@
 // ========================================
 async function checkAuth() {
   try {
-    const resp = await fetch('/auth/status');
+    const resp = await fetch(getBasePath() + '/auth/status');
     const data = await resp.json();
     if (data.setup_needed) {
       document.getElementById('auth-subtitle').textContent = '首次设置';
