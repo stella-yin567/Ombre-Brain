@@ -19,6 +19,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY *.py .
 COPY dashboard.html .
 COPY config.example.yaml ./config.yaml
+COPY start.sh .
+RUN chmod +x start.sh
 
 # Persistent mount point: bucket data
 # 持久化挂载点：记忆数据
