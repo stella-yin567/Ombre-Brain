@@ -1022,13 +1022,31 @@ async function saveHostVault() {
 }
 
 // authFetch: wraps fetch, shows auth overlay on 401
+/ 获取当前页面的基础路径（例如 /deepseek）
+function getBasePath() {
+    if (window.__BASE_PATH__ !== undefined) return window.__BASE_PATH__;
+    const path = window.location.pathname;      // 例如 /kk/dashboard
+    const parts = path.split('/');
+    // 假设子路径总是位于第一级（/kk/...），则取 /kk
+    if (parts.length >= 2 && parts[1] && !parts[1].includes('.')) {
+        window.__BASE_PATH__ = '/' + parts[1];
+    } else {
+        window.__BASE_PATH__ = '';
+    }
+    return window.__BASE_PATH__;
+}
+
 async function authFetch(url, options) {
-  const resp = await fetch(url, options);
-  if (resp.status === 401) {
-    doLogout();
-    return null;
-  }
-  return resp;
+    // 自动添加路径前缀（仅对绝对路径 `/xxx` 有效）
+    const base = getBasePath();
+    const fullUrl = (url.startsWith('/') && base) ? base + url : url;
+    
+    const resp = await fetch(fullUrl, options);
+    if (resp.status === 401) {
+        doLogout();
+        return null;
+    }
+    return resp;
 }
 
 // ========================================
