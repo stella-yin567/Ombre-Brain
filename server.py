@@ -230,7 +230,7 @@ async def auth_setup_endpoint(request):
     _save_password_hash(password)
     token = _create_session()
     resp = JSONResponse({"ok": True})
-    resp.set_cookie("ombre_session", token, httponly=True, samesite="lax", max_age=86400 * 7)
+    resp.set_cookie("ombre_session", token, httponly=True, samesite="lax", max_age=86400 * 7,path="/")
     return resp
 
 
@@ -246,7 +246,7 @@ async def auth_login(request):
     if _verify_any_password(password):
         token = _create_session()
         resp = JSONResponse({"ok": True})
-        resp.set_cookie("ombre_session", token, httponly=True, samesite="lax", max_age=86400 * 7)
+        resp.set_cookie("ombre_session", token, httponly=True, samesite="lax", max_age=86400 * 7,path="/")
         return resp
     return JSONResponse({"error": "密码错误"}, status_code=401)
 
@@ -286,7 +286,7 @@ async def auth_change_password(request):
     _sessions.clear()
     token = _create_session()
     resp = JSONResponse({"ok": True})
-    resp.set_cookie("ombre_session", token, httponly=True, samesite="lax", max_age=86400 * 7)
+    resp.set_cookie("ombre_session", token, httponly=True, samesite="lax", max_age=86400 * 7,path="/")
     return resp
 
 
