@@ -907,7 +907,7 @@ async function doSetup() {
 
 async function doLogin() {
   const pwd = document.getElementById('auth-login-pwd').value;
-  const resp = await fetch('/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({password: pwd}) });
+  const resp = await fetch(getBasePath() + '/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({password: pwd}) });
   if (resp.ok) {
     document.getElementById('auth-overlay').style.display = 'none';
   } else {
@@ -917,7 +917,7 @@ async function doLogin() {
 }
 
 async function doLogout() {
-  await fetch('/auth/logout', { method: 'POST' });
+  await fetch(getBasePath() + '/auth/logout', { method: 'POST' });
   document.getElementById('auth-setup-form').style.display = 'none';
   document.getElementById('auth-login-form').style.display = 'none';
   document.getElementById('auth-login-form').style.display = 'block';
