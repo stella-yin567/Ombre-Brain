@@ -617,6 +617,7 @@
   <div class="tab" data-tab="config">配置</div>
   <div class="tab" data-tab="import">导入</div>
   <div class="tab" data-tab="settings">设置</div>
+  <div class="tab" data-tab="emotion">情绪星图</div>
 </div>
 
 <div class="content" id="list-view">
@@ -834,6 +835,76 @@
     <div class="config-section">
       <h3>账号操作</h3>
       <button onclick="doLogout()" style="color:var(--negative);border-color:var(--negative);">退出登录</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Emotion Star Chart View / 情绪星图视图 -->
+<div class="content" id="emotion-view" style="display:none">
+  <div style="max-width:900px;margin:0 auto;">
+
+    <!-- Mood Snapshot Section / 心情快照 -->
+    <div class="config-section">
+      <h3>当前心情快照</h3>
+      <div id="emotion-snapshot" style="font-size:13px;color:var(--text-dim);line-height:2;">加载中…</div>
+    </div>
+
+    <!-- Russell V/A Star Chart / 情绪空间星图 -->
+    <div class="config-section">
+      <h3>情绪空间星图</h3>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;font-size:12px;color:var(--text-dim);">
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4A7C59;"></span> 正效价
+        <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#8B4A4A;margin-left:10px;"></span> 负效价
+        <span style="color:var(--text-light);margin-left:10px;">圆圈大小 = 情绪强度 | 悬停查看详情</span>
+      </div>
+      <canvas id="emotion-star-canvas" width="400" height="400" style="display:block;border-radius:16px;border:1px solid var(--border);background:var(--surface);cursor:crosshair;"></canvas>
+      <div id="emotion-tooltip" style="display:none;position:fixed;background:var(--surface-solid);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;pointer-events:none;z-index:200;box-shadow:0 4px 12px var(--shadow-dark-subtle);"></div>
+    </div>
+
+    <!-- Recent Events Table / 近期情绪事件表 -->
+    <div class="config-section">
+      <h3>近期情绪事件 <button onclick="loadEmotionView()" style="font-size:12px;padding:2px 10px;margin-left:8px;">刷新</button></h3>
+      <div id="emotion-events-table" style="overflow-x:auto;">
+        <div class="loading">加载中…</div>
+      </div>
+    </div>
+
+    <!-- Mood Pool Management / 心情池管理 -->
+    <div class="config-section">
+      <h3>心情池管理</h3>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+        <label style="font-size:13px;">角色</label>
+        <input type="text" id="emotion-character" value="default" style="width:120px;padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:13px;" />
+        <button onclick="loadEmotionView()">加载</button>
+      </div>
+      <div id="emotion-pool-list" style="margin-bottom:16px;">
+        <div class="loading">加载中…</div>
+      </div>
+      <div style="background:var(--surface);border-radius:12px;padding:16px;border:1px solid var(--border);">
+        <div style="font-size:13px;font-weight:500;margin-bottom:12px;color:var(--accent);">添加心情条目</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
+          <div>
+            <label style="font-size:11px;color:var(--text-light);display:block;margin-bottom:4px;">展示词</label>
+            <input type="text" id="pool-word" placeholder="✨ 今天有点小雀跃" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-solid);color:var(--text);font-size:12px;" />
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text-light);display:block;margin-bottom:4px;">情绪词（词典内）</label>
+            <input type="text" id="pool-feeling" placeholder="雀跃" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-solid);color:var(--text);font-size:12px;" />
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text-light);display:block;margin-bottom:4px;">类型</label>
+            <select id="pool-kind" style="width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface-solid);color:var(--text);font-size:12px;">
+              <option value="sparkle">sparkle ✨</option>
+              <option value="moon">moon 🌙</option>
+              <option value="cloud">cloud ⛅</option>
+              <option value="rain">rain 🌧</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-primary" onclick="addPoolEntry()">添加条目</button>
+        <span id="pool-add-msg" style="font-size:12px;margin-left:12px;"></span>
+      </div>
     </div>
 
   </div>
@@ -1066,10 +1137,12 @@ document.querySelectorAll('.tab').forEach(tab => {
     document.getElementById('config-view').style.display = target === 'config' ? '' : 'none';
     document.getElementById('import-view').style.display = target === 'import' ? '' : 'none';
     document.getElementById('settings-view').style.display = target === 'settings' ? '' : 'none';
+    document.getElementById('emotion-view').style.display = target === 'emotion' ? '' : 'none';
     if (target === 'network') loadNetwork();
     if (target === 'config') loadConfig();
     if (target === 'import') { pollImportStatus(); loadImportResults(); }
     if (target === 'settings') loadSettingsStatus();
+    if (target === 'emotion') loadEmotionView();
   });
 });
 
@@ -1664,6 +1737,292 @@ async function batchReview(idsJson, action) {
     });
     detectPatterns();
   } catch(e) {}
+}
+
+// ========================================
+// Emotion Star Chart
+// 情绪星图
+// ========================================
+
+let _emotionEvents = [];
+
+async function loadEmotionView() {
+  const character = document.getElementById('emotion-character').value.trim() || 'default';
+
+  // Load snapshot
+  try {
+    const res = await authFetch(BASE + '/api/mood/snapshot?character=' + encodeURIComponent(character));
+    if (res) {
+      const data = await res.json();
+      const snap = data.snapshot || {};
+      const pa = (snap.pa || 0).toFixed(3);
+      const na = (snap.na || 0).toFixed(3);
+      const deco = snap.deco;
+      const words = snap.high_arousal_words || [];
+      let html = '<div style="line-height:2;">';
+      if (deco) {
+        html += '<div>今日心情：<strong>' + esc(deco.word) + '</strong>（' + esc(deco.feeling) + '）</div>';
+      }
+      html += '<div>PA（正向情感）：<strong>' + pa + '</strong> &nbsp; NA（负向情感）：<strong>' + na + '</strong></div>';
+      if (words.length) {
+        html += '<div>近期高唤醒词：<strong>' + words.map(esc).join('、') + '</strong></div>';
+      }
+      html += '</div>';
+      document.getElementById('emotion-snapshot').innerHTML = html;
+    }
+  } catch(e) {
+    document.getElementById('emotion-snapshot').innerHTML = '<span style="color:var(--negative)">加载失败: ' + e.message + '</span>';
+  }
+
+  // Load events
+  try {
+    const res = await authFetch(BASE + '/api/emotion/events');
+    if (res) {
+      const events = await res.json();
+      _emotionEvents = events || [];
+      renderEventsTable(_emotionEvents);
+      drawStarChart(_emotionEvents);
+    }
+  } catch(e) {
+    document.getElementById('emotion-events-table').innerHTML = '<span style="color:var(--negative)">加载失败: ' + e.message + '</span>';
+  }
+
+  // Load pool
+  try {
+    const res = await authFetch(BASE + '/api/mood/pool?character=' + encodeURIComponent(character));
+    if (res) {
+      const pool = await res.json();
+      renderPoolList(pool, character);
+    }
+  } catch(e) {
+    document.getElementById('emotion-pool-list').innerHTML = '<span style="color:var(--negative)">加载失败: ' + e.message + '</span>';
+  }
+}
+
+function renderEventsTable(events) {
+  const container = document.getElementById('emotion-events-table');
+  if (!events || !events.length) {
+    container.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">暂无情绪事件记录</p>';
+    return;
+  }
+  const rows = events.map(ev => {
+    const v = (ev.valence || 0).toFixed(2);
+    const a = (ev.arousal || 0).toFixed(2);
+    const pa = (ev.pa_delta || 0).toFixed(2);
+    const na = (ev.na_delta || 0).toFixed(2);
+    const vColor = ev.valence >= 0 ? 'var(--positive)' : 'var(--negative)';
+    const time = ev.created_at ? ev.created_at.slice(0, 16).replace('T', ' ') : '';
+    return '<tr>' +
+      '<td style="padding:8px 10px;font-weight:500;">' + esc(ev.word || '') + '</td>' +
+      '<td style="padding:8px 10px;color:' + vColor + '">V' + v + ' / A' + a + '</td>' +
+      '<td style="padding:8px 10px;">' + (pa >= 0 ? '+' : '') + pa + '</td>' +
+      '<td style="padding:8px 10px;">' + (na >= 0 ? '+' : '') + na + '</td>' +
+      '<td style="padding:8px 10px;color:var(--text-light);font-size:11px;">' + esc(ev.match_source || '') + '</td>' +
+      '<td style="padding:8px 10px;color:var(--text-dim);font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(ev.reason || '') + '">' + esc(ev.reason || '') + '</td>' +
+      '<td style="padding:8px 10px;color:var(--text-light);font-size:11px;">' + time + '</td>' +
+    '</tr>';
+  }).join('');
+  container.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+    '<thead><tr style="border-bottom:1px solid var(--border);color:var(--text-light);font-size:11px;">' +
+    '<th style="padding:6px 10px;text-align:left;">情绪词</th>' +
+    '<th style="padding:6px 10px;text-align:left;">V/A</th>' +
+    '<th style="padding:6px 10px;text-align:left;">PA delta</th>' +
+    '<th style="padding:6px 10px;text-align:left;">NA delta</th>' +
+    '<th style="padding:6px 10px;text-align:left;">来源</th>' +
+    '<th style="padding:6px 10px;text-align:left;">原因</th>' +
+    '<th style="padding:6px 10px;text-align:left;">时间</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+function drawStarChart(events) {
+  const canvas = document.getElementById('emotion-star-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width;
+  const H = canvas.height;
+  const cx = W / 2;
+  const cy = H / 2;
+  const margin = 40;
+  const plotW = W - margin * 2;
+  const plotH = H - margin * 2;
+
+  // Clear
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || 'rgba(255,255,255,0.45)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Soft grid lines
+  ctx.strokeStyle = 'rgba(163, 148, 120, 0.15)';
+  ctx.lineWidth = 1;
+  // Vertical grid lines
+  for (let i = 0; i <= 4; i++) {
+    const x = margin + (plotW / 4) * i;
+    ctx.beginPath(); ctx.moveTo(x, margin); ctx.lineTo(x, H - margin); ctx.stroke();
+  }
+  // Horizontal grid lines
+  for (let i = 0; i <= 4; i++) {
+    const y = margin + (plotH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(margin, y); ctx.lineTo(W - margin, y); ctx.stroke();
+  }
+
+  // Axes (cross-hair)
+  ctx.strokeStyle = 'rgba(163, 148, 120, 0.4)';
+  ctx.lineWidth = 1.5;
+  // Horizontal (valence) axis — at center
+  ctx.beginPath(); ctx.moveTo(margin, cy); ctx.lineTo(W - margin, cy); ctx.stroke();
+  // Vertical (arousal) axis — valence=0 maps to cx
+  ctx.beginPath(); ctx.moveTo(cx, margin); ctx.lineTo(cx, H - margin); ctx.stroke();
+
+  // Axis labels
+  ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim() || '#8A8070';
+  ctx.font = '12px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('强烈', cx, margin - 6);
+  ctx.fillText('平静', cx, H - margin + 16);
+  ctx.textAlign = 'left';
+  ctx.fillText('正面', W - margin + 4, cy + 4);
+  ctx.textAlign = 'right';
+  ctx.fillText('负面', margin - 4, cy + 4);
+
+  // Quadrant labels (soft)
+  ctx.font = '11px Inter, sans-serif';
+  ctx.fillStyle = 'rgba(163, 148, 120, 0.5)';
+  ctx.textAlign = 'center';
+  ctx.fillText('焦虑/激动', margin + plotW * 0.25, margin + 20);
+  ctx.fillText('兴奋/快乐', margin + plotW * 0.75, margin + 20);
+  ctx.fillText('悲伤/低落', margin + plotW * 0.25, H - margin - 8);
+  ctx.fillText('平静/舒适', margin + plotW * 0.75, H - margin - 8);
+
+  // Helper: map valence (-1..1) to canvas x, arousal (0..1) to canvas y
+  function toX(v) { return margin + (v + 1) / 2 * plotW; }
+  function toY(a) { return H - margin - a * plotH; }
+
+  // Store dot positions for hover
+  canvas._dots = [];
+
+  // Plot events
+  for (const ev of (events || [])) {
+    const v = ev.valence || 0;   // -1..1
+    const a = ev.arousal || 0;   // 0..1
+    const pa = ev.pa_delta || 0;
+    const na = ev.na_delta || 0;
+    const intensity = Math.abs(pa) + Math.abs(na);
+    const r = Math.max(3, Math.min(10, 3 + intensity * 8));
+
+    const x = toX(v);
+    const y = toY(a);
+
+    // Color: positive valence = teal/positive, negative = rose/negative
+    const isPositive = v >= 0;
+    const color = isPositive
+      ? 'rgba(74, 124, 89, 0.75)'    // --positive
+      : 'rgba(139, 74, 74, 0.75)';   // --negative
+
+    // Draw circle
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = isPositive ? 'rgba(74, 124, 89, 1)' : 'rgba(139, 74, 74, 1)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    canvas._dots.push({ x, y, r: r + 4, ev });
+  }
+
+  // Hover tooltip handler
+  canvas.onmousemove = function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const tooltip = document.getElementById('emotion-tooltip');
+    let found = null;
+    for (const dot of (canvas._dots || [])) {
+      const dx = mx - dot.x;
+      const dy = my - dot.y;
+      if (Math.sqrt(dx*dx + dy*dy) < dot.r) {
+        found = dot.ev;
+        break;
+      }
+    }
+    if (found) {
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 12) + 'px';
+      tooltip.style.top = (e.clientY - 8) + 'px';
+      tooltip.innerHTML =
+        '<strong>' + esc(found.word || '') + '</strong>' +
+        '<br>V:' + (found.valence||0).toFixed(2) + ' A:' + (found.arousal||0).toFixed(2) +
+        '<br>PA:' + (found.pa_delta||0).toFixed(2) + ' NA:' + (found.na_delta||0).toFixed(2) +
+        (found.reason ? '<br><span style="color:var(--text-dim)">' + esc(found.reason.slice(0,60)) + '</span>' : '');
+    } else {
+      tooltip.style.display = 'none';
+    }
+  };
+  canvas.onmouseleave = function() {
+    document.getElementById('emotion-tooltip').style.display = 'none';
+  };
+}
+
+function renderPoolList(pool, character) {
+  const container = document.getElementById('emotion-pool-list');
+  if (!pool || !pool.length) {
+    container.innerHTML = '<p style="color:var(--text-dim);font-size:13px;">心情池为空</p>';
+    return;
+  }
+  container.innerHTML = pool.map(function(entry) {
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface);border-radius:10px;margin-bottom:6px;font-size:13px;">' +
+      '<span style="flex:1;">' + esc(entry.word) + '</span>' +
+      '<span style="color:var(--text-dim);font-size:11px;min-width:60px;">' + esc(entry.feeling_word) + '</span>' +
+      '<span style="color:var(--text-light);font-size:11px;min-width:50px;">' + esc(entry.kind) + '</span>' +
+      '<button onclick="deletePoolEntry(' + entry.id + ',\'' + esc(character) + '\')" style="color:var(--negative);background:none;border:none;cursor:pointer;font-size:16px;padding:0 4px;">×</button>' +
+    '</div>';
+  }).join('');
+}
+
+async function deletePoolEntry(id, character) {
+  if (!confirm('确认删除这条心情条目？')) return;
+  try {
+    const res = await authFetch(BASE + '/api/mood/pool', {
+      method: 'DELETE',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id }),
+    });
+    if (res) loadEmotionView();
+  } catch(e) {}
+}
+
+async function addPoolEntry() {
+  const word = document.getElementById('pool-word').value.trim();
+  const feeling = document.getElementById('pool-feeling').value.trim();
+  const kind = document.getElementById('pool-kind').value;
+  const character = document.getElementById('emotion-character').value.trim() || 'default';
+  const msg = document.getElementById('pool-add-msg');
+  if (!word || !feeling) { msg.textContent = '展示词和情绪词不能为空'; msg.style.color = 'var(--negative)'; return; }
+  try {
+    const res = await authFetch(BASE + '/api/mood/pool', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ character, word, feeling_word: feeling, kind }),
+    });
+    if (res) {
+      const data = await res.json();
+      if (data.ok) {
+        msg.textContent = '已添加';
+        msg.style.color = 'var(--positive)';
+        document.getElementById('pool-word').value = '';
+        document.getElementById('pool-feeling').value = '';
+        loadEmotionView();
+      } else {
+        msg.textContent = data.error || '添加失败';
+        msg.style.color = 'var(--negative)';
+      }
+    }
+  } catch(e) {
+    msg.textContent = '请求失败: ' + e.message;
+    msg.style.color = 'var(--negative)';
+  }
 }
 </script>
 </body>

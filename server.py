@@ -103,6 +103,12 @@ dehydrator = Dehydrator(config)                      # Dehydrator / 脱水器
 decay_engine = DecayEngine(config, bucket_mgr)       # Decay engine / 衰减引擎
 import_engine = ImportEngine(config, bucket_mgr, dehydrator, embedding_engine)  # Import engine / 导入引擎
 
+from emotion_scorer import EmotionScorer
+from mood_pool import MoodPool
+
+emotion_scorer = EmotionScorer(config, embedding_engine=embedding_engine)
+mood_pool_mgr = MoodPool(config)
+
 # --- Create MCP server instance / 创建 MCP 服务器实例 ---
 # host="0.0.0.0" so Docker container's SSE is externally reachable
 # stdio mode ignores host (no network)
@@ -1260,6 +1266,60 @@ async def dream() -> str:
 
 
 # =============================================================
+# Tool 7: mood — Mood snapshot
+# 工具 7：mood — 当前心情快照
+#
+# Returns natural-language description of current emotional state
+# suitable for injection into system prompt.
+# 返回当前情绪状态的自然语言描述，可注入 system prompt。
+# =============================================================
+@mcp.tool()
+async def mood(character: str = "default") -> str:
+    """获取角色当前心情快照。含PANAS状态、装饰心情、近期高唤醒词。返回可注入system prompt的自然语言描述。"""
+    import json as _json
+
+    # 1. Get PANAS today
+    panas = emotion_scorer.get_panas_today()
+    pa = panas.get("pa", 0.0)
+    na = panas.get("na", 0.0)
+
+    # 2. Get decoration mood
+    deco = mood_pool_mgr.today_mood(character)
+
+    # 3. Get high arousal words
+    words = emotion_scorer.get_recent_high_arousal_words(5)
+
+    # 4. Build natural language parts
+    parts = []
+    if deco:
+        parts.append(f"此刻的状态：{deco['word']}（{deco['feeling']}）")
+
+    if pa > 0.3:
+        parts.append("最近心情不错，正向情感比较高")
+    elif na > 0.4:
+        parts.append("最近有些不安或紧张，负向情感偏高")
+
+    if words:
+        parts.append(f"近期情绪关键词：{'、'.join(words)}")
+
+    mood_text = "\n".join(parts) if parts else "心情平稳，没有明显起伏"
+    mood_prompt = f"【当下心情状态】\n{mood_text}\n（自然融入回答中，不要主动点破这些状态）"
+
+    snapshot = {
+        "pa": pa,
+        "na": na,
+        "deco": deco,
+        "high_arousal_words": words,
+    }
+
+    return _json.dumps(
+        {"snapshot": snapshot, "mood_prompt": mood_prompt},
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+# =============================================================
 # Dashboard API endpoints (for lightweight Web UI)
 # 仪表板 API（轻量 Web UI 用）
 # =============================================================
@@ -1875,6 +1935,140 @@ async def api_import_review(request):
             errors += 1
 
     return JSONResponse({"applied": applied, "errors": errors})
+
+
+# =============================================================
+# Emotion & Mood API endpoints
+# 情绪与心情 API 端点
+# =============================================================
+
+@mcp.custom_route("/api/emotion/events", methods=["GET"])
+async def api_emotion_events(request):
+    """Return recent mood events for dashboard."""
+    from starlette.responses import JSONResponse
+    err = _require_auth(request)
+    if err: return err
+    try:
+        events = emotion_scorer.get_recent_events(20)
+        return JSONResponse(events)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@mcp.custom_route("/api/emotion/score", methods=["POST"])
+async def api_emotion_score(request):
+    """Fire-and-forget emotion score of submitted text."""
+    from starlette.responses import JSONResponse
+    err = _require_auth(request)
+    if err: return err
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+    text = body.get("text", "")
+    if not text:
+        return JSONResponse({"error": "missing text"}, status_code=400)
+
+    async def _run_score():
+        try:
+            await emotion_scorer.score_emotion(text)
+        except Exception as e:
+            logger.warning(f"Background emotion score failed: {e}")
+
+    asyncio.create_task(_run_score())
+    return JSONResponse({"ok": 1})
+
+
+@mcp.custom_route("/api/mood/snapshot", methods=["GET"])
+async def api_mood_snapshot(request):
+    """Get mood snapshot (PANAS + decoration mood + high arousal words)."""
+    import json as _json
+    from starlette.responses import JSONResponse
+    err = _require_auth(request)
+    if err: return err
+    character = request.query_params.get("character", "default")
+    try:
+        panas = emotion_scorer.get_panas_today()
+        pa = panas.get("pa", 0.0)
+        na = panas.get("na", 0.0)
+        deco = mood_pool_mgr.today_mood(character)
+        words = emotion_scorer.get_recent_high_arousal_words(5)
+
+        parts = []
+        if deco:
+            parts.append(f"此刻的状态：{deco['word']}（{deco['feeling']}）")
+        if pa > 0.3:
+            parts.append("最近心情不错，正向情感比较高")
+        elif na > 0.4:
+            parts.append("最近有些不安或紧张，负向情感偏高")
+        if words:
+            parts.append(f"近期情绪关键词：{'、'.join(words)}")
+
+        mood_text = "\n".join(parts) if parts else "心情平稳，没有明显起伏"
+        mood_prompt = f"【当下心情状态】\n{mood_text}\n（自然融入回答中，不要主动点破这些状态）"
+
+        return JSONResponse({
+            "snapshot": {"pa": pa, "na": na, "deco": deco, "high_arousal_words": words},
+            "mood_prompt": mood_prompt,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@mcp.custom_route("/api/mood/pool", methods=["GET"])
+async def api_mood_pool_list(request):
+    """List mood pool entries for a character."""
+    from starlette.responses import JSONResponse
+    err = _require_auth(request)
+    if err: return err
+    character = request.query_params.get("character", "default")
+    try:
+        return JSONResponse(mood_pool_mgr.list_pool(character))
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@mcp.custom_route("/api/mood/pool", methods=["POST"])
+async def api_mood_pool_add(request):
+    """Add a new mood pool entry."""
+    from starlette.responses import JSONResponse
+    err = _require_auth(request)
+    if err: return err
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+    character = body.get("character", "default")
+    word = body.get("word", "")
+    feeling_word = body.get("feeling_word", "")
+    kind = body.get("kind", "sparkle")
+    if not word or not feeling_word:
+        return JSONResponse({"error": "word and feeling_word required"}, status_code=400)
+    try:
+        new_id = mood_pool_mgr.add_entry(character, word, feeling_word, kind)
+        return JSONResponse({"ok": 1, "id": new_id})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@mcp.custom_route("/api/mood/pool", methods=["DELETE"])
+async def api_mood_pool_delete(request):
+    """Delete a mood pool entry."""
+    from starlette.responses import JSONResponse
+    err = _require_auth(request)
+    if err: return err
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid JSON"}, status_code=400)
+    entry_id = body.get("id")
+    if entry_id is None:
+        return JSONResponse({"error": "id required"}, status_code=400)
+    try:
+        deleted = mood_pool_mgr.delete_entry(int(entry_id))
+        return JSONResponse({"ok": 1 if deleted else 0})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 # =============================================================
