@@ -1320,6 +1320,69 @@ async def mood(character: str = "default") -> str:
 
 
 # =============================================================
+# Tool 8: score — Emotion scoring feedback loop
+# 工具 8：score — 情绪评分闭环
+#
+# Call after every reply to the user. Fire-and-forget: returns
+# immediately while background task scores the conversation and
+# writes results to mood_events.db + an ambient emotion bucket.
+# 每次回复用户后调用。立即返回，后台异步完成评分和写入。
+# =============================================================
+@mcp.tool()
+async def score(conversation: str, character: str = "default") -> str:
+    """每次回复用户后调用。传入本轮对话摘要，触发PANAS情绪评分，写入情绪历史和ambient层。fire-and-forget，立即返回不阻塞。"""
+
+    async def _score_and_store(text: str, char: str) -> None:
+        try:
+            event = await emotion_scorer.score_emotion(text)
+            if not event or "error" in event:
+                return
+
+            word = event.get("word", "")
+            reason = event.get("reason", "")
+            valence_raw = event.get("valence", 0.0)   # -1..1
+            arousal = event.get("arousal", 0.3)        # 0..1
+            pa = event.get("pa_delta", 0.0)
+            na = event.get("na_delta", 0.0)
+
+            # Convert valence -1..1 → 0..1 for bucket system
+            bucket_valence = max(0.0, min(1.0, (valence_raw + 1.0) / 2.0))
+
+            # Build content for ambient bucket
+            content_parts = []
+            if word:
+                content_parts.append(word)
+            if reason:
+                content_parts.append(reason)
+            if pa or na:
+                content_parts.append(f"PA{pa:+.2f} NA{na:+.2f}")
+            content = "  ".join(content_parts) if content_parts else "情绪记录"
+
+            # Write to ambient emotion bucket (importance=1, fast decay)
+            bucket_id = await bucket_mgr.create(
+                content=content,
+                tags=["情绪评分", char] if char != "default" else ["情绪评分"],
+                importance=1,
+                domain=["情绪"],
+                valence=bucket_valence,
+                arousal=arousal,
+                name=word or "情绪记录",
+                bucket_type="dynamic",
+            )
+            try:
+                await embedding_engine.generate_and_store(bucket_id, content)
+            except Exception:
+                pass
+
+            logger.info(f"score: ambient bucket {bucket_id} ({word}) V={valence_raw:.2f} A={arousal:.2f}")
+        except Exception as e:
+            logger.warning(f"score background task failed: {e}")
+
+    asyncio.create_task(_score_and_store(conversation, character))
+    return "情绪评分已触发"
+
+
+# =============================================================
 # Dashboard API endpoints (for lightweight Web UI)
 # 仪表板 API（轻量 Web UI 用）
 # =============================================================
