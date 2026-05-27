@@ -198,6 +198,47 @@ def _is_authenticated(request) -> bool:
     return True
 
 
+def _verify_score_token(token: str) -> bool:
+    """
+    Check Bearer token for the emotion score endpoint.
+    优先查 OMBRE_SCORE_TOKEN 环境变量（独立 API key）；
+    未设置时回退到 dashboard 密码。
+    """
+    score_token = os.environ.get("OMBRE_SCORE_TOKEN", "").strip()
+    if score_token:
+        return hmac.compare_digest(token, score_token)
+    return _verify_any_password(token)
+
+
+_SCORE_CORS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+}
+
+
+def _require_score_auth(request):
+    """
+    Auth for /api/emotion/score — accepts either:
+      1. Valid session cookie (dashboard login)
+      2. Authorization: Bearer <OMBRE_SCORE_TOKEN or dashboard password>
+    CORS headers are always added so the response is cross-origin safe.
+    """
+    from starlette.responses import JSONResponse
+    if _is_authenticated(request):
+        return None
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[7:].strip()
+        if token and _verify_score_token(token):
+            return None
+    return JSONResponse(
+        {"error": "Unauthorized. Set Authorization: Bearer <OMBRE_SCORE_TOKEN>"},
+        status_code=401,
+        headers=_SCORE_CORS,
+    )
+
+
 def _require_auth(request):
     """Return JSONResponse(401) if not authenticated, else None."""
     from starlette.responses import JSONResponse
@@ -2018,19 +2059,33 @@ async def api_emotion_events(request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@mcp.custom_route("/api/emotion/score", methods=["POST"])
+@mcp.custom_route("/api/emotion/score", methods=["POST", "OPTIONS"])
 async def api_emotion_score(request):
-    """Fire-and-forget emotion score of submitted text."""
-    from starlette.responses import JSONResponse
-    err = _require_auth(request)
-    if err: return err
+    """
+    Fire-and-forget PANAS emotion scoring.
+    面向外部中间层设计，支持跨域调用：
+      - OPTIONS  → CORS preflight，无需鉴权
+      - POST     → Bearer token 或 session cookie 鉴权
+    Body: {"text": "对话内容", "character": "default"}
+    """
+    from starlette.responses import JSONResponse, Response
+
+    # CORS preflight — no auth needed
+    if request.method == "OPTIONS":
+        return Response(status_code=204, headers=_SCORE_CORS)
+
+    err = _require_score_auth(request)
+    if err:
+        return err
+
     try:
         body = await request.json()
     except Exception:
-        return JSONResponse({"error": "invalid JSON"}, status_code=400)
-    text = body.get("text", "")
+        return JSONResponse({"error": "invalid JSON"}, status_code=400, headers=_SCORE_CORS)
+
+    text = body.get("text", "").strip()
     if not text:
-        return JSONResponse({"error": "missing text"}, status_code=400)
+        return JSONResponse({"error": "missing text"}, status_code=400, headers=_SCORE_CORS)
 
     async def _run_score():
         try:
@@ -2039,7 +2094,7 @@ async def api_emotion_score(request):
             logger.warning(f"Background emotion score failed: {e}")
 
     asyncio.create_task(_run_score())
-    return JSONResponse({"ok": 1})
+    return JSONResponse({"ok": 1}, headers=_SCORE_CORS)
 
 
 @mcp.custom_route("/api/mood/snapshot", methods=["GET"])
